@@ -113,8 +113,7 @@ function Demo:reset()
   self.callsign = "ARCADE"
   self.carry = nil
   self.drops = {}
-  self.attract = true
-  self.attract_t = 0
+  self.cast = 0
   self:use_kit(self._kit_name or "ghost")
   self:layout_pads()
 end
@@ -884,12 +883,7 @@ function Demo:set_think(text, done)
   self:flush_think(not not done)
 end
 
-function Demo:dismiss_attract()
-  self.attract = false
-end
-
 function Demo:launch_from_enter()
-  self:dismiss_attract()
   local cx, cy = self:composer_origin()
   self.x, self.y = cx, cy
   self.launch_x, self.launch_y = cx, cy
@@ -953,6 +947,7 @@ function Demo:clear_live()
   self.working = false
   self.carry = nil
   self.drops = {}
+  self.cast = 0
 end
 
 function Demo:say(text, who)
@@ -995,12 +990,8 @@ function Demo:update(dt)
   self:layout_pads()
   self.t = self.t + dt
   self.blink = self.blink + dt
-  if self.attract then
-    self.attract_t = (self.attract_t or 0) + dt
-    self.pulse = 0.4 + 0.6 * math.abs(math.sin(self.t * 5))
-    return
-  end
   self.pulse = self.pulse * math.exp(-7 * dt)
+  self.cast = (self.cast or 0) + dt
   self.sky_a = math.max(0, self.sky_a - dt / 1.6)
   self.trail[#self.trail + 1] = {self.x, self.y}
   if #self.trail > 22 then table.remove(self.trail, 1) end
@@ -1180,21 +1171,6 @@ end
 function Demo:draw()
   self:layout_pads()
   local kit0 = self.kit or Kit.get("ghost")
-  if self.attract then
-    D.title_card(self.attract_t or self.t, W, H, {
-      title = kit0.title or "ARCADE",
-      tagline = kit0.tagline or "PRESS START",
-      hero = kit0.hero or "ghost",
-      shot = kit0.shot or "coin",
-      stage = kit0.stage or "arcade",
-      hull = kit0.hull,
-      scale = kit0.attract_scale or 7.4,
-    })
-    if self.scanlines then
-      for y = 0, H - 1, 3 do D.rect(0, y, W, 1, INK, 0.10) end
-    end
-    return
-  end
   D.stage(kit0.stage or "arcade", self.t, W, H, self.sky, self.sky_a)
 
   local bx, by, bw, bh = unpack(self.box)
@@ -1427,10 +1403,11 @@ function Demo:draw()
       end
     end
     local hull = kit.hull or self.sky
-    if (kit.hero or "ghost") ~= "aladdin" then
+    local hero = kit.hero or "ghost"
+    if hero ~= "aladdin" and hero ~= "harry" then
       hull = self.sky or hull
     end
-    D.hero(kit.hero or "ghost", self.x, self.y + bob, self.facing, self.scale, self.pulse, hull, CYAN, CREAM, WHITE, PINK)
+    D.hero(kit.hero or "ghost", self.x, self.y + bob, self.facing, self.scale, (kit.hero == "harry") and (self.cast or self.t) or self.pulse, hull, CYAN, CREAM, WHITE, PINK)
   end
 end
 

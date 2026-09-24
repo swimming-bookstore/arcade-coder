@@ -3,7 +3,7 @@
 --     pad.kit.register({ name = "ghost", hero = "ghost", shot = "coin", courier = true })
 --     demo:use_kit("ghost")
 --
--- Built-ins: ghost, invader, frog, ship, dog, cat, aladdin.
+-- Built-ins: ghost, invader, frog, ship, dog, cat, aladdin, harry.
 -- Override with env ARCADE_KIT or Demo.new({ kit = "frog" }).
 
 local K = {}
@@ -158,6 +158,28 @@ K.register({
   attract_scale = 8.0,
   muzzle = function(demo)
     return demo.x + demo.facing * 36, demo.y - 14
+  end,
+})
+
+K.register({
+  name = "harry",
+  title = "HARRY",
+  callsign = "WAND",
+  hero = "harry",
+  shot = "spell",
+  think_shot = "spell",
+  trail = "spell",
+  stage = "hogwarts",
+  tagline = "WINGARDIUM CODE-OSA",
+  hull = {36, 48, 120},
+  scale = 4.6,
+  attract_scale = 7.6,
+  -- raised wand tip — same pose as draw.harry
+  muzzle = function(demo)
+    local draw = require("draw")
+    local wave = demo.cast or demo.t or 0
+    local p = draw.harry_pose(demo.x, demo.y, demo.facing, demo.scale, wave)
+    return p.tipx, p.tipy
   end,
 })
 
