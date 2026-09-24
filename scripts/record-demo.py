@@ -20,6 +20,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -205,6 +206,26 @@ def parse_kits(argv: list[str]) -> list[str]:
     return [kit]
 
 
+def window_size() -> tuple[int, int]:
+    """LÖVE window pixels, not the 640x360 game canvas."""
+    try:
+        out = subprocess.check_output(
+            ["xwininfo", "-name", TITLE],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=2,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return 1280, 720
+    w = h = 0
+    for line in out.splitlines():
+        if "Width:" in line:
+            w = int(line.split()[-1])
+        elif "Height:" in line:
+            h = int(line.split()[-1])
+    return (w or 1280, h or 720)
+
+
 def record_kit(kit: str, love: str) -> int:
     out = demo_path(kit)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -232,43 +253,57 @@ def record_kit(kit: str, love: str) -> int:
         stderr=subprocess.DEVNULL,
     )
     try:
-        with WindowRecord(
-            TITLE,
-            out,
-            fps=FPS,
-            max_sec=MAX_SEC + 8,
-            min_w=640,
-            min_h=360,
-            hide_cursor=True,
-            overlay_pointer=True,
-        ) as rec:
-            rec.hold(0.6)
-            rec.focus()
-            rec.hold(0.35)
-            rec.type_text(PROMPT, delay=0.04)
-            rec.hold(0.4)
-            rec.key("Return")
-            rec.hold(0.5)
-            t0 = time.monotonic()
-            idle = 0.0
-            saw_busy = False
-            while time.monotonic() - t0 < MAX_SEC:
-                u = (time.monotonic() - t0) * 0.55
-                x, y = figure8(u, 640, 340, 260, 100)
-                rec.move(x, y)
-                st = http_json("/api/status")
-                busy = bool(st.get("busy"))
-                if busy:
-                    idle = 0.0
-                    saw_busy = True
-                elif saw_busy:
-                    idle += 0.12
-                    if idle >= 4.0:
-                        rec.hold(0.6)
-                        break
-                time.sleep(0.12)
-            if not saw_busy:
-                print("agent never went busy — keys may have missed the composer", file=sys.stderr)
+        # Type the first half before ffmpeg opens, so the clip starts mid-sentence.
+        half = len(PROMPT) // 2
+        gate = threading.Event()
+        WindowRecord._capture_gate = gate
+        try:
+            with WindowRecord(
+                TITLE,
+                out,
+                fps=FPS,
+                max_sec=MAX_SEC + 8,
+                min_w=640,
+                min_h=360,
+                hide_cursor=True,
+                overlay_pointer=True,
+            ) as rec:
+                rec.hold(0.8)
+                rec.focus()
+                ww, wh = window_size()
+                # composer is the bottom HUD bar; click it before the first letter
+                rec.click(ww * 0.5, wh - 36)
+                rec.hold(0.35)
+                rec.type_text(PROMPT[:half], delay=0.045)
+                rec.hold(0.15)
+                gate.set()
+                rec.hold(0.35)
+                rec.type_text(PROMPT[half:], delay=0.045)
+                rec.hold(0.4)
+                rec.key("Return")
+                rec.hold(0.5)
+                t0 = time.monotonic()
+                idle = 0.0
+                saw_busy = False
+                while time.monotonic() - t0 < MAX_SEC:
+                    u = (time.monotonic() - t0) * 0.55
+                    x, y = figure8(u, 640, 340, 260, 100)
+                    rec.move(x, y)
+                    st = http_json("/api/status")
+                    busy = bool(st.get("busy"))
+                    if busy:
+                        idle = 0.0
+                        saw_busy = True
+                    elif saw_busy:
+                        idle += 0.12
+                        if idle >= 4.0:
+                            rec.hold(0.6)
+                            break
+                    time.sleep(0.12)
+                if not saw_busy:
+                    print("agent never went busy — keys may have missed the composer", file=sys.stderr)
+        finally:
+            WindowRecord._capture_gate = None
         if not out.is_file() or out.stat().st_size < 1000:
             print(f"{out} missing or tiny", file=sys.stderr)
             return 1
