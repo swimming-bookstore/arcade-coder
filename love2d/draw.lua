@@ -300,6 +300,32 @@ function M.shot(kind, x, y, col, t)
     love.graphics.polygon("fill", x + 7, ny - 12, x + 16, ny - 6, x + 7, ny - 4)
     love.graphics.setColor(c({255, 255, 255}, 0.85))
     love.graphics.ellipse("fill", x - 4, ny + 5, 3, 2)
+  elseif kind == "spell" then
+    -- pointed wand bolt: gold rim, cyan body, white core, trailing sparks
+    local spin = (t or 0) * 8
+    local gold = {255, 214, 92}
+    local core = {255, 255, 255}
+    M.glow(x, y, 26, col, 0.28)
+    M.glow(x, y, 12, gold, 0.45)
+    local function star(rad, inner, rot, rgb, a)
+      local pts = {}
+      for i = 0, 7 do
+        local ang = rot + i * math.pi / 4
+        local rr = (i % 2 == 0) and rad or inner
+        pts[#pts + 1] = x + math.cos(ang) * rr
+        pts[#pts + 1] = y + math.sin(ang) * rr
+      end
+      love.graphics.setColor(c(rgb, a or 1))
+      love.graphics.polygon("fill", pts)
+    end
+    star(16, 6, spin, gold, 0.95)
+    star(11, 4, -spin * 0.7, col, 0.9)
+    star(5, 2, spin * 1.4, core, 1)
+    for i = 1, 4 do
+      local a = -spin * 1.6 + i * 1.5
+      local dist = 12 + i * 4
+      M.diamond(x + math.cos(a) * dist, y + math.sin(a) * dist * 0.65, 2.2, (i % 2 == 0) and gold or core, 0.8)
+    end
   else
     M.diamond(x - 2, y, 8, col, 0.95)
   end
@@ -895,115 +921,6 @@ function M.alley(t, W, H, sky_tint, sky_a)
   end
 end
 
-function M.title_card(t, W, H, spec)
-  spec = spec or {}
-  local GOLD = {255, 220, 48}
-  local PINK = {255, 48, 196}
-  local CYAN = {48, 255, 255}
-  local CREAM = {255, 244, 220}
-  local WHITE = {255, 255, 255}
-  local INK = {8, 2, 18}
-  local hull = spec.hull or PINK
-  M.stage(spec.stage or "arcade", t, W, H, hull, 0.22)
-  -- vignette so the marquee pops
-  for i = 0, 10 do
-    local a = 0.04 + i * 0.035
-    M.rect(0, i * 8, W, 8, INK, a)
-    M.rect(0, H - 140 + i * 8, W, 10, INK, 0.12 + i * 0.055)
-  end
-  M.rect(0, 0, 28, H, INK, 0.35)
-  M.rect(W - 28, 0, 28, H, INK, 0.35)
-  -- cabinet bolts
-  local bolt = function(x, y)
-    M.rect(x, y, 14, 14, {40, 12, 48}, 0.95)
-    M.rect(x + 3, y + 3, 8, 8, GOLD, 0.85)
-  end
-  bolt(18, 18)
-  bolt(W - 32, 18)
-  bolt(18, H - 32)
-  bolt(W - 32, H - 32)
-  -- neon frame
-  M.rect(36, 16, W - 72, 6, hull, 0.95)
-  M.rect(36, 22, W - 72, 3, CYAN, 0.7)
-  M.rect(36, H - 22, W - 72, 6, hull, 0.95)
-  M.rect(36, H - 25, W - 72, 3, CYAN, 0.7)
-  M.rect(16, 36, 6, H - 72, hull, 0.9)
-  M.rect(W - 22, 36, 6, H - 72, hull, 0.9)
-  -- orbiting shots
-  local shot = spec.shot or "coin"
-  for i = 0, 15 do
-    local a = t * 1.35 + i * (math.pi * 2 / 16)
-    local r = 210 + math.sin(t * 2.4 + i) * 22
-    local sx = W / 2 + math.cos(a) * r
-    local sy = H * 0.50 + math.sin(a) * r * 0.46
-    M.shot(shot, sx, sy, (i % 2 == 0) and GOLD or hull, t + i)
-  end
-  -- spotlight under the hero
-  local bob = math.sin(t * 2.6) * 8
-  local hx, hy = W / 2, H * 0.48 + bob
-  M.glow(hx, hy + 18, 210, GOLD, 0.16)
-  M.glow(hx, hy, 140, hull, 0.22)
-  love.graphics.setColor(GOLD[1] / 255, GOLD[2] / 255, GOLD[3] / 255, 0.10)
-  love.graphics.ellipse("fill", hx, hy + 78, 160, 28)
-  local face = (math.sin(t * 0.85) > 0) and 1 or -1
-  local pulse = 0.35 + 0.65 * math.abs(math.sin(t * 5))
-  M.hero(spec.hero or "ghost", hx, hy, face, spec.scale or 7.2, pulse, hull, CYAN, CREAM, WHITE, PINK)
-  -- marquee title
-  local title = spec.title or "ARCADE"
-  local sc = 6
-  local tw = M.textW(title, sc)
-  while tw > W - 160 and sc > 3 do
-    sc = sc - 1
-    tw = M.textW(title, sc)
-  end
-  local tx = math.floor((W - tw) / 2)
-  local ty = 34
-  local th = 18 + 8 * sc
-  M.rect(tx - 48, ty - 18, tw + 96, th + 28, INK, 0.78)
-  M.rect(tx - 48, ty - 18, tw + 96, 7, hull, 1)
-  M.rect(tx - 48, ty + th + 3, tw + 96, 5, CYAN, 0.95)
-  -- chasing marquee lights
-  for i = 0, 18 do
-    local on = ((math.floor(t * 8) + i) % 3) ~= 0
-    local lx = tx - 40 + i * math.floor((tw + 80) / 18)
-    M.rect(lx, ty - 12, 8, 8, on and GOLD or {80, 40, 12}, on and 1 or 0.45)
-    M.rect(lx, ty + th - 2, 8, 8, on and CYAN or {12, 48, 64}, on and 1 or 0.45)
-  end
-  M.text(title, tx + 5, ty + 7, INK, sc)
-  M.text(title, tx + 2, ty + 2, hull, sc, 0.55)
-  M.text(title, tx, ty, GOLD, sc)
-  -- sparkles around the title
-  for i = 0, 10 do
-    local sp = 0.4 + 0.6 * math.abs(math.sin(t * 7 + i * 1.7))
-    local sx = tx - 30 + (i * 97 + t * 40) % (tw + 60)
-    local sy = ty - 8 + (i % 3) * (th * 0.4)
-    M.rect(sx, sy, 3, 3, WHITE, sp)
-  end
-  local tag = spec.tagline or ""
-  if tag ~= "" then
-    local tsc = 2
-    local tgw = M.textW(tag, tsc)
-    M.text(tag, math.floor((W - tgw) / 2) + 2, ty + th + 18, INK, tsc)
-    M.text(tag, math.floor((W - tgw) / 2), ty + th + 16, CYAN, tsc)
-  end
-  -- arcade START plate
-  local blink = (t % 1.25) < 0.82
-  local start = "START"
-  local ssc = 5
-  local sw = M.textW(start, ssc)
-  local sx = math.floor((W - sw) / 2)
-  local sy = H - 108
-  M.rect(sx - 40, sy - 18, sw + 80, 78, INK, 0.82)
-  M.rect(sx - 40, sy - 18, sw + 80, 6, hull, 1)
-  M.rect(sx - 40, sy + 54, sw + 80, 6, CYAN, 0.95)
-  M.rect(sx - 34, sy - 8, sw + 68, 56, {28, 8, 36}, 0.95)
-  if blink then
-    M.glow(W / 2, sy + 22, 90, GOLD, 0.18)
-    M.text(start, sx + 4, sy + 8, INK, ssc)
-    M.text(start, sx, sy + 4, GOLD, ssc)
-  end
-end
-
 -- Aladdin: arcade pixel — fez, vest, pants, short flute, flying carpet.
 function M.aladdin(cx, cy, facing, scale, pulse, hull, CYAN, CREAM, WHITE, PINK)
   local s = 4.4 * (scale or 3)
@@ -1086,6 +1003,358 @@ function M.aladdin(cx, cy, facing, scale, pulse, hull, CYAN, CREAM, WHITE, PINK)
   M.rect(fx + f * 0.34 * s - (f < 0 and 0.08 * s or 0), fy - 0.05 * s, 0.08 * s, 0.14 * s, gold)
   M.rect(fx + f * 0.10 * s - (f < 0 and 0.04 * s or 0), fy + 0.02 * s, 0.04 * s, 0.04 * s, ink)
   M.rect(fx + f * 0.22 * s - (f < 0 and 0.04 * s or 0), fy + 0.02 * s, 0.04 * s, 0.04 * s, ink)
+end
+
+-- Shared pose so the drawn wand tip and kit.muzzle stay the same point.
+function M.harry_pose(cx, cy, facing, scale, pulse)
+  local s = 4.0 * (scale or 3)
+  local f = (facing or 1) >= 0 and 1 or -1
+  local bob = math.sin((pulse or 0) * 6) * 0.045 * s
+  local cast = 0.5 + 0.5 * math.sin((pulse or 0) * 9)
+  local wrist_x = cx + f * 0.55 * s
+  local wrist_y = cy + bob - (0.95 + cast * 0.55) * s
+  return {
+    s = s, f = f, bob = bob, cast = cast,
+    cy = cy + bob,
+    ax = wrist_x, ay = wrist_y,
+    tipx = wrist_x + f * (1.15 + cast * 0.15) * s,
+    tipy = wrist_y - (0.85 + cast * 0.35) * s,
+  }
+end
+
+local function setc(rgb, a)
+  love.graphics.setColor(rgb[1] / 255, rgb[2] / 255, rgb[3] / 255, a or 1)
+end
+
+-- Harry Potter: one silhouette, round glasses, robe, raised wand.
+function M.harry(cx, cy, facing, scale, pulse, hull, CYAN, CREAM, WHITE, PINK)
+  local p = M.harry_pose(cx, cy, facing, scale, pulse)
+  local s, f, cast = p.s, p.f, p.cast
+  cy = p.cy
+  local skin = {255, 206, 164}
+  local skin_sh = {214, 150, 112}
+  local hair = {18, 10, 8}
+  local robe = {22, 28, 72}
+  local robe_sh = {12, 16, 42}
+  local robe_hi = {58, 78, 156}
+  local scarf = {176, 28, 40}
+  local gold = {228, 176, 56}
+  local ink = {14, 8, 8}
+  local wand = {132, 78, 32}
+  local bolt = CYAN or {48, 255, 255}
+  local eye = {36, 96, 52}
+  local white = WHITE or {255, 255, 255}
+
+  M.glow(cx + f * 0.2 * s, cy - 0.4 * s, s * 1.8, bolt, 0.08)
+
+  setc({0, 0, 0}, 0.30)
+  love.graphics.ellipse("fill", cx, cy + 1.55 * s, 0.72 * s, 0.12 * s)
+
+  -- robe as one cloak, wider at the hem
+  setc(robe)
+  love.graphics.polygon(
+    "fill",
+    cx - 0.28 * s, cy - 0.55 * s,
+    cx + 0.34 * s, cy - 0.55 * s,
+    cx + 0.62 * s, cy + 1.35 * s,
+    cx + 0.18 * s, cy + 1.48 * s,
+    cx - 0.55 * s, cy + 1.35 * s
+  )
+  setc(robe_sh)
+  love.graphics.polygon(
+    "fill",
+    cx + 0.02 * s, cy - 0.40 * s,
+    cx + 0.28 * s, cy - 0.48 * s,
+    cx + 0.55 * s, cy + 1.28 * s,
+    cx + 0.12 * s, cy + 1.38 * s
+  )
+  setc(robe_hi, 0.55)
+  love.graphics.polygon(
+    "fill",
+    cx - 0.22 * s, cy - 0.42 * s,
+    cx - 0.06 * s, cy - 0.42 * s,
+    cx - 0.18 * s, cy + 1.10 * s,
+    cx - 0.38 * s, cy + 1.05 * s
+  )
+  -- gold hem
+  setc(gold)
+  love.graphics.polygon(
+    "fill",
+    cx - 0.52 * s, cy + 1.28 * s,
+    cx + 0.58 * s, cy + 1.28 * s,
+    cx + 0.18 * s, cy + 1.48 * s,
+    cx - 0.50 * s, cy + 1.40 * s
+  )
+  setc(robe)
+  love.graphics.polygon(
+    "fill",
+    cx - 0.46 * s, cy + 1.32 * s,
+    cx + 0.50 * s, cy + 1.32 * s,
+    cx + 0.18 * s, cy + 1.44 * s,
+    cx - 0.42 * s, cy + 1.38 * s
+  )
+
+  -- shoes
+  setc({16, 10, 8})
+  love.graphics.ellipse("fill", cx - 0.22 * s, cy + 1.46 * s, 0.18 * s, 0.07 * s)
+  love.graphics.ellipse("fill", cx + 0.16 * s, cy + 1.46 * s, 0.18 * s, 0.07 * s)
+
+  -- scarf: a band at the collar and a striped tail
+  setc(scarf)
+  love.graphics.ellipse("fill", cx, cy - 0.52 * s, 0.30 * s, 0.10 * s)
+  local tx = cx - f * 0.20 * s
+  love.graphics.polygon(
+    "fill",
+    tx - 0.06 * s, cy - 0.48 * s,
+    tx + 0.06 * s, cy - 0.48 * s,
+    tx + 0.08 * s, cy + 0.28 * s,
+    tx - 0.04 * s, cy + 0.36 * s
+  )
+  setc(gold)
+  love.graphics.rectangle("fill", tx - 0.06 * s, cy - 0.18 * s, 0.12 * s, 0.06 * s)
+  love.graphics.rectangle("fill", tx - 0.06 * s, cy + 0.02 * s, 0.12 * s, 0.05 * s)
+  love.graphics.rectangle("fill", tx - 0.06 * s, cy + 0.18 * s, 0.12 * s, 0.05 * s)
+  setc(gold)
+  love.graphics.circle("fill", cx + f * 0.06 * s, cy - 0.22 * s, 0.055 * s)
+  setc(scarf)
+  love.graphics.circle("fill", cx + f * 0.06 * s, cy - 0.22 * s, 0.028 * s)
+
+  -- off arm, tucked
+  setc(robe_sh)
+  love.graphics.polygon(
+    "fill",
+    cx - f * 0.22 * s, cy - 0.35 * s,
+    cx - f * 0.48 * s, cy - 0.05 * s,
+    cx - f * 0.42 * s, cy + 0.18 * s,
+    cx - f * 0.16 * s, cy - 0.10 * s
+  )
+  setc(skin)
+  love.graphics.circle("fill", cx - f * 0.46 * s, cy + 0.16 * s, 0.08 * s)
+
+  -- head
+  setc(skin)
+  love.graphics.circle("fill", cx, cy - 0.92 * s, 0.36 * s)
+  -- ear on the facing side
+  setc(skin_sh)
+  love.graphics.circle("fill", cx + f * 0.34 * s, cy - 0.88 * s, 0.07 * s)
+  setc(skin)
+  love.graphics.circle("fill", cx + f * 0.33 * s, cy - 0.88 * s, 0.045 * s)
+
+  -- hair mass sits above the eyes so the glasses stay readable
+  setc(hair)
+  love.graphics.circle("fill", cx, cy - 1.12 * s, 0.30 * s)
+  -- side locks stop above the glasses
+  love.graphics.polygon(
+    "fill",
+    cx - 0.28 * s, cy - 1.24 * s,
+    cx - 0.36 * s, cy - 1.00 * s,
+    cx - 0.14 * s, cy - 1.08 * s
+  )
+  love.graphics.polygon(
+    "fill",
+    cx + 0.16 * s, cy - 1.22 * s,
+    cx + 0.34 * s, cy - 1.00 * s,
+    cx + 0.06 * s, cy - 1.08 * s
+  )
+  -- short fringe, clear of both lenses
+  love.graphics.polygon(
+    "fill",
+    cx - 0.22 * s, cy - 1.24 * s,
+    cx - 0.08 * s, cy - 1.08 * s,
+    cx + 0.02 * s, cy - 1.26 * s
+  )
+  love.graphics.polygon(
+    "fill",
+    cx + 0.08 * s, cy - 1.24 * s,
+    cx + 0.18 * s, cy - 1.08 * s,
+    cx + 0.26 * s, cy - 1.22 * s
+  )
+  love.graphics.polygon("fill", cx - 0.12 * s, cy - 1.32 * s, cx - 0.02 * s, cy - 1.52 * s, cx + 0.06 * s, cy - 1.30 * s)
+  love.graphics.polygon("fill", cx + 0.10 * s, cy - 1.28 * s, cx + 0.22 * s, cy - 1.46 * s, cx + 0.18 * s, cy - 1.24 * s)
+
+  -- lightning scar, just under the fringe
+  setc({196, 36, 48})
+  love.graphics.setLineWidth(math.max(1.6, 0.035 * s))
+  love.graphics.line(
+    cx + 0.02 * s, cy - 1.08 * s,
+    cx + 0.10 * s, cy - 1.00 * s,
+    cx + 0.02 * s, cy - 0.94 * s,
+    cx + 0.08 * s, cy - 0.88 * s
+  )
+
+  -- round glasses
+  local gy = cy - 0.90 * s
+  local function lens(rx)
+    setc({170, 214, 255}, 0.35)
+    love.graphics.circle("fill", rx, gy, 0.115 * s)
+    setc(ink)
+    love.graphics.setLineWidth(math.max(1.6, 0.04 * s))
+    love.graphics.circle("line", rx, gy, 0.12 * s)
+    setc(eye)
+    love.graphics.circle("fill", rx + f * 0.02 * s, gy, 0.04 * s)
+    setc(white)
+    love.graphics.circle("fill", rx - 0.035 * s, gy - 0.035 * s, 0.018 * s)
+  end
+  lens(cx - 0.13 * s + f * 0.03 * s)
+  lens(cx + 0.13 * s + f * 0.03 * s)
+  setc(ink)
+  love.graphics.setLineWidth(math.max(1.4, 0.03 * s))
+  love.graphics.line(cx - 0.01 * s, gy, cx + 0.01 * s, gy)
+  -- nose + smile
+  setc(skin_sh)
+  love.graphics.circle("fill", cx + f * 0.04 * s, cy - 0.74 * s, 0.035 * s)
+  setc({160, 70, 74})
+  love.graphics.arc("line", cx + f * 0.02 * s, cy - 0.66 * s, 0.07 * s, 0.3, math.pi - 0.3)
+
+  -- raised arm: sleeve from shoulder to wrist
+  local shx, shy = cx + f * 0.20 * s, cy - 0.35 * s
+  setc(robe)
+  love.graphics.setLineWidth(0.22 * s)
+  love.graphics.line(shx, shy, p.ax, p.ay)
+  setc(robe_hi, 0.7)
+  love.graphics.setLineWidth(0.08 * s)
+  love.graphics.line(shx + f * 0.04 * s, shy - 0.04 * s, p.ax, p.ay)
+  -- cuff
+  setc(gold)
+  love.graphics.circle("fill", p.ax - f * 0.04 * s, p.ay + 0.06 * s, 0.09 * s)
+  -- hand
+  setc(skin)
+  love.graphics.circle("fill", p.ax, p.ay, 0.11 * s)
+  setc(skin_sh, 0.7)
+  love.graphics.circle("fill", p.ax + f * 0.04 * s, p.ay + 0.03 * s, 0.05 * s)
+
+  -- wand from the fist to the muzzle
+  local hx, hy = p.ax - f * 0.02 * s, p.ay + 0.08 * s
+  setc(wand)
+  love.graphics.setLineWidth(math.max(1.6, 0.035 * s))
+  love.graphics.line(hx, hy, p.tipx, p.tipy)
+  setc({186, 124, 58})
+  love.graphics.setLineWidth(math.max(1, 0.02 * s))
+  love.graphics.line(hx, hy, p.tipx, p.tipy)
+  setc(gold)
+  love.graphics.circle("fill", hx, hy, 0.045 * s)
+  M.glow(p.tipx, p.tipy, 0.36 * s, bolt, 0.30 + 0.2 * cast)
+  setc(white)
+  love.graphics.circle("fill", p.tipx, p.tipy, 0.045 * s)
+  love.graphics.setLineWidth(1)
+end
+
+-- Hogwarts night: moon, cliff castle, lake, a few floating candles.
+function M.hogwarts(t, W, H, sky_tint, sky_a)
+  local TOP = {4, 6, 22}
+  local MID = {16, 20, 58}
+  local DUSK = {64, 36, 78}
+  local STONE = {108, 112, 128}
+  local STONE2 = {62, 66, 84}
+  local ROOF = {42, 28, 36}
+  local GOLD = {255, 206, 88}
+  local CREAM = {255, 236, 196}
+  local LAKE = {10, 22, 48}
+  local LAKE2 = {22, 48, 88}
+  sky_a = sky_a or 0
+  local horizon = math.floor(H * 0.58)
+  for i = 0, 28 do
+    local k = i / 28
+    local col = k < 0.55 and M.mix(TOP, MID, k / 0.55) or M.mix(MID, DUSK, (k - 0.55) / 0.45)
+    if sky_tint and sky_a > 0.01 then
+      col = M.mix(col, sky_tint, 0.12 * sky_a)
+    end
+    M.rect(0, math.floor(horizon * k), W, math.ceil(horizon / 28) + 1, col)
+  end
+  for i = 0, 70 do
+    local sx = (i * 173) % W
+    local sy = (i * 47) % math.max(8, horizon - 110)
+    local tw = 0.25 + 0.75 * (0.5 + 0.5 * math.sin(t * 2.2 + i))
+    local big = (i % 11 == 0)
+    M.rect(sx, sy, big and 3 or 2, big and 3 or 2, (i % 5 == 0) and GOLD or CREAM, 0.2 + 0.55 * tw)
+  end
+  local mx, my, mr = W * 0.14, horizon * 0.26, 46
+  M.glow(mx, my, mr * 2.4, CREAM, 0.18)
+  love.graphics.setColor(0.96, 0.95, 0.88, 0.96)
+  love.graphics.circle("fill", mx, my, mr)
+  love.graphics.setColor(0.86, 0.86, 0.78, 0.35)
+  love.graphics.circle("fill", mx - 10, my - 8, 14)
+  love.graphics.setColor(TOP[1] / 255, TOP[2] / 255, TOP[3] / 255, 1)
+  love.graphics.circle("fill", mx + 18, my - 8, mr * 0.78)
+
+  -- cliffs
+  love.graphics.setColor(0.08, 0.09, 0.16, 1)
+  love.graphics.polygon("fill", 0, horizon + 20, W * 0.22, horizon - 30, W * 0.38, horizon + 24, 0, horizon + 40)
+  love.graphics.polygon("fill", W, horizon + 10, W * 0.78, horizon - 18, W * 0.62, horizon + 30, W, horizon + 36)
+  love.graphics.setColor(0.12, 0.10, 0.16, 1)
+  love.graphics.polygon("fill", W * 0.34, horizon + 6, W * 0.48, horizon - 70, W * 0.70, horizon + 8)
+
+  local base = horizon - 4
+  local function tower(x, w, h, win, roof_h)
+    M.rect(x, base - h, w, h + 8, STONE)
+    for row = 0, math.floor(h / 18) do
+      M.rect(x, base - h + row * 18, w, 2, STONE2, 0.45)
+    end
+    M.rect(x - 4, base - h - 6, w + 8, 10, STONE2)
+    love.graphics.setColor(c(ROOF))
+    love.graphics.polygon("fill", x - 10, base - h - 4, x + w / 2, base - h - roof_h, x + w + 10, base - h - 4)
+    love.graphics.setColor(c(GOLD, 0.8))
+    love.graphics.polygon("fill", x + w / 2 - 6, base - h - roof_h + 8, x + w / 2, base - h - roof_h - 6, x + w / 2 + 6, base - h - roof_h + 8)
+    for i = 0, win - 1 do
+      local wy = base - 36 - i * 32
+      if wy > base - h + 18 then
+        local flick = 0.45 + 0.55 * (0.5 + 0.5 * math.sin(t * 3.2 + i + x * 0.02))
+        M.glow(x + w * 0.5, wy + 8, 16, GOLD, 0.08 * flick)
+        M.rect(x + w * 0.32, wy, 10, 16, GOLD, flick)
+        M.rect(x + w * 0.32 + 3, wy + 3, 4, 6, CREAM, 0.7 * flick)
+      end
+    end
+  end
+  -- great hall ridge
+  M.rect(W * 0.30, base - 78, W * 0.40, 86, STONE2)
+  M.rect(W * 0.30, base - 86, W * 0.40, 10, STONE)
+  for i = 0, 7 do
+    local wx = W * 0.33 + i * (W * 0.04)
+    local flick = 0.4 + 0.5 * (0.5 + 0.5 * math.sin(t * 2.4 + i))
+    M.rect(wx, base - 52, 12, 18, GOLD, flick)
+  end
+  tower(W * 0.28, 58, 168, 4, 52)
+  tower(W * 0.38, 78, 236, 6, 70)
+  tower(W * 0.50, 46, 128, 3, 40)
+  tower(W * 0.58, 66, 198, 5, 58)
+  -- gate
+  M.rect(W * 0.455, base - 52, 40, 56, {12, 8, 16})
+  love.graphics.setColor(c(GOLD, 0.7))
+  love.graphics.arc("line", W * 0.455 + 20, base - 52, 20, math.pi, 0)
+  M.rect(W * 0.448, base - 64, 54, 12, STONE)
+  -- bridge to the left cliff
+  M.rect(W * 0.12, base - 16, W * 0.18, 14, STONE)
+  M.rect(W * 0.12, base - 22, W * 0.18, 4, STONE2)
+  for i = 0, 4 do
+    local bx = W * 0.15 + i * 40
+    love.graphics.setColor(c(STONE))
+    love.graphics.setLineWidth(3)
+    love.graphics.arc("line", bx, base - 2, 16, math.pi, 0)
+  end
+  love.graphics.setLineWidth(1)
+
+  -- lake
+  for i = 0, 14 do
+    local k = i / 14
+    M.rect(0, horizon + math.floor((H - horizon) * k), W, math.ceil((H - horizon) / 14) + 1, M.mix(LAKE, LAKE2, k))
+  end
+  M.glow(mx + 80, horizon + 70, 110, CREAM, 0.07)
+  for i = 0, 7 do
+    local lx = (i * 190 + t * 14) % (W + 80) - 40
+    local ly = horizon + 28 + (i % 4) * 36 + math.sin(t * 1.3 + i) * 4
+    M.rect(lx, ly, 90, 2, CREAM, 0.10 + 0.10 * math.sin(t * 2 + i))
+  end
+
+  -- a handful of candles, not a swarm of spell bolts
+  for i = 0, 6 do
+    local cx = 90 + (i * 170) % (W - 160) + math.sin(t * 0.7 + i) * 10
+    local cy = 48 + (i % 3) * 36 + math.sin(t * 1.3 + i) * 8
+    M.glow(cx, cy - 8, 14, GOLD, 0.22)
+    M.rect(cx - 3, cy, 6, 14, {232, 210, 170})
+    M.rect(cx - 2, cy - 6, 4, 8, GOLD, 0.9)
+    love.graphics.setColor(c({255, 160, 48}, 0.85))
+    love.graphics.circle("fill", cx, cy - 8, 3)
+  end
 end
 
 return M

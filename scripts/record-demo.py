@@ -28,7 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 LOVE_DIR = ROOT / "love2d"
 WS = Path(os.environ.get("ARCADE_WORKSPACE", "/tmp/demo"))
-KITS = ("ghost", "invader", "frog", "ship", "dog", "cat", "aladdin")
+KITS = ("ghost", "invader", "frog", "ship", "dog", "cat", "aladdin", "harry")
 TITLE = "Arcade Coder"
 FPS = int(os.environ.get("FPS", "15"))
 MAX_SEC = float(os.environ.get("DURATION", "90"))
@@ -122,21 +122,21 @@ def prepare_workspace() -> None:
                 pass
 
 
-def kill_listener() -> None:
-    subprocess.run(
-        ["pkill", "-f", "python3 -m fighter"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    )
-    deadline = time.time() + 3
-    while time.time() < deadline and port_open(HOST, PORT):
-        time.sleep(0.1)
+def free_port() -> int:
+    """Don't steal 8765. Another project may already be serving files there."""
+    if not port_open(HOST, PORT):
+        return PORT
+    for p in range(PORT + 1, PORT + 20):
+        if not port_open(HOST, p):
+            return p
+    print(f"no free port near {PORT}", file=sys.stderr)
+    sys.exit(1)
 
 
 def ensure_fighter() -> subprocess.Popen[bytes] | None:
-    if port_open(HOST, PORT):
-        kill_listener()
+    global PORT, URL
+    PORT = free_port()
+    URL = f"http://{HOST}:{PORT}/"
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
     proc = subprocess.Popen(
@@ -244,9 +244,7 @@ def record_kit(kit: str, love: str) -> int:
         ) as rec:
             rec.hold(0.6)
             rec.focus()
-            rec.hold(float(os.environ.get("ATTRACT_SEC", "3.2")))
-            rec.click(90, 690)
-            rec.hold(0.25)
+            rec.hold(0.35)
             rec.type_text(PROMPT, delay=0.04)
             rec.hold(0.4)
             rec.key("Return")

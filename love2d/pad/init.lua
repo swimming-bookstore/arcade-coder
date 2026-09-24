@@ -1,7 +1,7 @@
 -- Arcade Coder pad: chalkboard + kit hero.
 --
 --     local pad = require("pad")
---     local demo = pad.Demo.new({ kit = "ghost" })  -- ghost | invader | frog | ship | dog | cat | aladdin
+--     local demo = pad.Demo.new({ kit = "ghost" })  -- ghost | invader | frog | ship | dog | cat | aladdin | harry
 --     pad.kit.register({ name = "slime", hero = "frog", shot = "bubble", courier = true })
 --     pad.client.apply(demo, event, { name = "Arcade Coder", callsign = "ARCADE" })
 --

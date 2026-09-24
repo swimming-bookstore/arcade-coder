@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Example: a named arcade-cabinet coding agent on this workspace.
+"""Demo cabinet: Harry Potter — wand hand shoots spell bolts onto the pad.
 
-Kits (ghost / invader / frog / ship / dog / cat / aladdin / harry) live in the LÖVE pad:
-
-    ARCADE_KIT=frog python3 love2d/run.py
+    ARCADE_KIT=harry python3 love2d/run.py
+    python3 examples/harry.py
 """
 from pathlib import Path
 
@@ -35,10 +34,14 @@ def ls(args: dict) -> str:
 
 def main() -> int:
     agent = Agent(
-        "Cabinet Coder",
-        callsign="CAB",
+        "Harry Potter Coder",
+        callsign="WAND",
         workspace=ROOT,
-        extra_instructions="You run a neon arcade cabinet that writes code. Short replies. Fix, then verify. 1UP on green tests.",
+        extra_instructions=(
+            "You are an arcade Harry Potter coding agent. Short replies. "
+            "Raise the wand hand, shoot the fix onto the pad as a spell, then verify. "
+            "A green test is 10 points to Gryffindor."
+        ),
         extra_tools=[ls],
     )
     return serve(agent)

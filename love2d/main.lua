@@ -68,8 +68,6 @@ local function boot_pad()
   demo.x, demo.y = W / 2, -80
   demo.launch = 0
   demo.linger = 0
-  demo.attract = true
-  demo.attract_t = 0
 end
 
 function love.load(args)
@@ -92,7 +90,6 @@ function love.load(args)
     demo.working = true
     demo.linger = 99
     demo.caption = "FOLLOW  ·  mouse"
-    demo.attract = false
     demo:launch_from_enter()
     cmd_ch = love.thread.getChannel("agent_cmd")
     ev_ch = love.thread.getChannel("agent_ev")
@@ -143,10 +140,6 @@ end
 local function send(text)
   text = (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
   if demo.working then return end
-  if demo.attract then
-    demo:dismiss_attract()
-    if text == "" then return end
-  end
   if text == "" then
     if not logged_in then
       begin_login()
@@ -301,9 +294,7 @@ function love.draw()
   love.graphics.setCanvas(canvas)
   love.graphics.clear(pad.VOID[1] / 255, pad.VOID[2] / 255, pad.VOID[3] / 255, 1)
   demo:draw()
-  if not (demo and demo.attract) then
-    draw_hud()
-  end
+  draw_hud()
   love.graphics.setCanvas()
 
   local ww, wh = love.graphics.getDimensions()
@@ -317,12 +308,10 @@ end
 function love.textinput(t)
   if t == "\n" or t == "\r" then return end
   if demo.working then return end
-  if demo.attract then demo:dismiss_attract() end
   composer = composer .. t
 end
 
 function love.mousepressed()
-  if demo and demo.attract then demo:dismiss_attract() end
 end
 
 function love.keypressed(key)
@@ -347,11 +336,7 @@ function love.keypressed(key)
   end
   if key == "tab" then
     local name = demo:cycle_kit()
-    if demo.attract then
-      demo.attract_t = 0
-    else
-      demo:say("kit  " .. tostring(name), "KIT")
-    end
+    demo:say("kit  " .. tostring(name), "KIT")
     return
   end
   if key == "n" and love.keyboard.isDown("lctrl", "rctrl") then

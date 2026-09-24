@@ -13,8 +13,8 @@ python3 -m fighter --name "Arcade Coder"
 python3 love2d/run.py
 ```
 
-Tab cycles kits: `ghost` · `invader` · `frog` · `ship` · `dog` · `cat` · `aladdin`.
-Each kit boots on its own attract / title card (maze, space, pond, neon, kennel, alley, Agrabah). Enter or click starts the turn. Demos hold that card first (`ATTRACT_SEC`).
+Tab cycles kits: `ghost` · `invader` · `frog` · `ship` · `dog` · `cat` · `aladdin` · `harry`.
+Each kit drops straight into its stage (maze, space, pond, neon, kennel, alley, Agrabah, Hogwarts). No title card.
 
 ```bash
 ARCADE_KIT=aladdin python3 love2d/run.py
@@ -60,11 +60,11 @@ pad.kit.register({
   name = "slime",
   title = "SLIME",
   callsign = "GOO",
-  hero = "frog",     -- ghost | invader | frog | ship | dog | cat | aladdin  (or add draw.hero)
-  shot = "note",     -- coin | pellet | bubble | spark | capsule | bone | yarn | note
+  hero = "frog",     -- ghost | invader | frog | ship | dog | cat | aladdin | harry  (or add draw.hero)
+  shot = "note",     -- coin | pellet | bubble | spark | capsule | bone | yarn | note | spell
   think_shot = "spark",
   trail = "spark",
-  stage = "agrabah", -- arcade | agrabah | maze | space | pond | kennel | alley
+  stage = "agrabah", -- arcade | agrabah | maze | space | pond | kennel | alley | hogwarts
   courier = true,  -- fly there and put it down (ghost default)
   scale = 3.2,
   muzzle = function(demo)
@@ -90,6 +90,9 @@ ARCADE_KIT=dog python3 love2d/run.py
 
 python3 examples/cat.py
 ARCADE_KIT=cat python3 love2d/run.py
+
+python3 examples/harry.py
+ARCADE_KIT=harry python3 love2d/run.py
 ```
 
 ## Needs

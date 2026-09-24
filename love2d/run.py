@@ -5,7 +5,7 @@
     ARCADE_KIT=frog love love2d
 
 Starts `python3 -m fighter` if nothing is listening on the pad port.
-Kits: ghost (coins), invader (pellets), frog (bubbles), ship (capsules), dog (bones), cat (yarn), aladdin (notes).
+Kits: ghost (coins), invader (pellets), frog (bubbles), ship (capsules), dog (bones), cat (yarn), aladdin (notes), harry (spells).
 """
 from __future__ import annotations
 
