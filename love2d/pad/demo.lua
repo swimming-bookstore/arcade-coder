@@ -61,6 +61,7 @@ function Demo:reset()
   self.thinkEmitted = 0
   self.think_fill = 0
   self.think_nl = false
+  self.think_row = 0
   self.trail = {}
   self.sky = SKY_PY
   self.sky_a = 0
@@ -183,10 +184,111 @@ end
 
 function Demo:muzzle()
   local kit = self.kit or Kit.get("ghost")
+  local x, y
   if kit.muzzle then
-    return kit.muzzle(self)
+    x, y = kit.muzzle(self)
+  else
+    x, y = self.x + self.facing * 22, self.y
   end
-  return self.x + self.facing * 22, self.y
+  return x, y
+end
+
+function Demo:wand()
+  local kit = self.kit or Kit.get("ghost")
+  return kit.aim == "wand"
+end
+
+-- One slash per shot. Landing a line or a second bolt must not restart it.
+function Demo:flick()
+  if self:wand() then
+    if (self.pulse or 0) < 0.18 then
+      self.pulse = 1
+    end
+  else
+    self.pulse = 1
+  end
+end
+
+-- Aim at the last glyph of the word, the way busan lands on the end of the line.
+-- col is the first letter; the bolt hits col + #text.
+function Demo:think_shot_target(col, row, nchars)
+  local wx, wy, ww, wh = self:think_well()
+  local width = self:think_width()
+  local n = #self.think_board
+  local shown = math.min(4, n)
+  local base = n == 0 and 0 or (shown - 1)
+  local r = base + (row or 0)
+  if r > 3 then r = 3 end
+  local c = (col or 0) + math.max(0, (nchars or 1) - 1)
+  if c < 0 then c = 0 end
+  if c > width - 1 then c = width - 1 end
+  local hx = wx + 10 + c * 16
+  hx = math.max(wx + 12, math.min(wx + ww - 18, hx))
+  local hy = wy + 26 + r * 16
+  hy = math.max(wy + 26, math.min(wy + wh - 14, hy))
+  return hx, hy, hx, hy
+end
+
+function Demo:spawn_shot(x0, y0, hx, hy, extra)
+  local tx, ty = hx, hy
+  if extra and extra.tx then tx, ty = extra.tx, extra.ty end
+  local dx, dy = tx - x0, ty - y0
+  local dist = math.sqrt(dx * dx + dy * dy)
+  if dist < 1 then dist = 1 end
+  local speed = (extra and extra.speed) or 860
+  local shot = {
+    x = x0, y = y0, vx = (dx / dist) * speed, vy = (dy / dist) * speed,
+    hx = hx, hy = hy, tx = tx, ty = ty, age = 0, life = 2.4, form = 0,
+  }
+  if extra then
+    for k, v in pairs(extra) do
+      if k ~= "speed" and k ~= "tx" and k ~= "ty" then shot[k] = v end
+    end
+  end
+  return shot
+end
+
+function Demo:steer_shot(sh, dt, speed)
+  local tx, ty = sh.tx or sh.hx, sh.ty or sh.hy
+  local dx, dy = tx - sh.x, ty - sh.y
+  local dist = math.sqrt(dx * dx + dy * dy)
+  local toward = sh.vx * dx + sh.vy * dy
+  local hit = dist < 14 or (sh.age > 0.08 and toward <= 0) or sh.age >= (sh.life or 2.4)
+  if hit then
+    sh.form = 1
+    sh.x, sh.y = sh.hx, sh.hy
+    sh.vx, sh.vy = 0, 0
+    return true
+  end
+  local k = 1 - math.exp(-12 * dt)
+  speed = speed or 860
+  local inv = 1 / (dist < 1 and 1 or dist)
+  sh.vx = sh.vx + (dx * inv * speed - sh.vx) * k
+  sh.vy = sh.vy + (dy * inv * speed - sh.vy) * k
+  sh.x = sh.x + sh.vx * dt
+  sh.y = sh.y + sh.vy * dt
+  sh.form = math.min(0.9, 1 - dist / 180)
+  return false
+end
+
+-- Stand on the hall floor in front of the thinking well and shoot up into it.
+-- Parking the wand tip inside the box lifts the whole robe to the top of the screen.
+function Demo:wand_stand()
+  local wx, wy, ww, wh = self:think_well()
+  local face = -1
+  local bx, by, bw, bh = self:stage()
+  local sway = math.sin((self.phase or 0) * 0.7) * 28
+  local tx = wx + ww * 0.5 + sway
+  tx = math.max(bx + 80, math.min(bx + bw - 80, tx))
+  -- body on the floor of the cabinet, under the well, not up in the rafters
+  local ty = by + bh - 78
+  return tx, ty, face
+end
+
+-- While a thought is in the air, stand under the well and face it.
+-- Otherwise track the pointer the way the other kits do.
+function Demo:wand_follow()
+  return false
 end
 
 function Demo:courier()
@@ -210,14 +312,7 @@ function Demo:put_down()
     self:apply_shell_line(c.text)
     self.shellGap = 0.1
   elseif c.kind == "think" then
-    local last = self.think_board[#self.think_board]
-    local width = self:think_width()
-    if c.join and last and #(last .. " " .. c.text) <= width then
-      self.think_board[#self.think_board] = last .. " " .. c.text
-    else
-      self.think_board[#self.think_board + 1] = U.clip_text(c.text, width)
-    end
-    if #self.think_board > 6 then table.remove(self.think_board, 1) end
+    self:land_think(c.text, c.join, c.col)
     self.thinkGap = 0.05
   end
   self.drops = self.drops or {}
@@ -227,7 +322,7 @@ function Demo:put_down()
     hx = c.hx, hy = c.hy, age = 0, life = 0.28,
     kind = c.kind, text = c.text,
   }
-  self.pulse = 1
+  self:flick()
   self.carry = nil
 end
 
@@ -239,9 +334,8 @@ function Demo:steer_carry(dt)
   elseif c.kind == "shell" then
     c.hx, c.hy = self:shell_line_xy(c.dest)
   elseif c.kind == "think" then
-    local wx, wy, ww, wh = self:think_well()
-    c.hx = wx + 10 + (c.col or 0) * 16
-    c.hy = wy + wh - 22
+    local hx, hy = self:think_caret()
+    c.hx, c.hy = hx, hy
   end
   local tx, ty, face = self:carry_stand(c)
   self.facing = face
@@ -259,6 +353,24 @@ function Demo:steer_carry(dt)
   return true
 end
 
+function Demo:think_caret()
+  local hx, hy = self:think_shot_target(self.think_fill or 0, 0)
+  return hx, hy
+end
+
+function Demo:land_think(text, join, col)
+  local width = self:think_width()
+  local last = self.think_board[#self.think_board]
+  local piece = text or ""
+  -- one space, then the word. Padding out to a predicted column is what opened the gaps.
+  if join and last and #(last .. " " .. piece) <= width then
+    self.think_board[#self.think_board] = last .. " " .. piece
+  else
+    self.think_board[#self.think_board + 1] = U.clip_text(piece, width)
+  end
+  if #self.think_board > 6 then table.remove(self.think_board, 1) end
+end
+
 function Demo:think_width()
   local _, _, ww = self:think_well()
   return math.max(8, math.floor((ww - 24) / 16))
@@ -267,6 +379,7 @@ end
 function Demo:enqueue_think(word)
   word = tostring(word or "")
   if word == "" then return end
+  -- one word per bolt, aimed at the caret after the words already queued
   local width = self:think_width()
   for _, piece in ipairs(U.split_word(word, width)) do
     local fill = self.think_fill or 0
@@ -274,11 +387,14 @@ function Demo:enqueue_think(word)
     self.think_nl = false
     local join = (not force) and fill > 0 and (fill + 1 + #piece <= width)
     local col = join and (fill + 1) or 0
-    self.think_q[#self.think_q + 1] = { text = piece, join = join, col = col }
+    local row = self.think_row or 0
+    -- col is the first letter; the bolt aims at the last glyph from there
+    self.think_q[#self.think_q + 1] = { text = piece, join = join, col = col, row = row }
     self.think_fill = col + #piece
-    if #piece >= width then
+    if #piece >= width or self.think_fill >= width then
       self.think_nl = true
       self.think_fill = 0
+      self.think_row = row + 1
     end
   end
 end
@@ -290,10 +406,10 @@ function Demo:fire_next_thought()
     if self.carry then return end
     local item = table.remove(self.think_q, 1)
     if type(item) == "string" then item = { text = item, join = false, col = 0 } end
-    local wx, wy, ww, wh = self:think_well()
+    local hx, hy = self:think_shot_target(item.col or 0, item.row or 0, #(item.text or ""))
     self.carry = {
       kind = "think", text = item.text, join = item.join, col = item.col or 0,
-      hx = wx + 10 + (item.col or 0) * 16, hy = wy + wh - 22,
+      hx = hx, hy = hy,
     }
     self.think_busy = true
     return
@@ -302,22 +418,28 @@ function Demo:fire_next_thought()
   for _, th in ipairs(self.thoughts) do
     if th.form < 1 then flying = flying + 1 end
   end
+  -- busan keeps five words in the air; one at a time reads as slow
   if flying >= 5 then return end
   local item = table.remove(self.think_q, 1)
   if type(item) == "string" then item = { text = item, join = false, col = 0 } end
-  local wx, wy, ww, wh = self:think_well()
   local x0, y0 = self:muzzle()
-  local hx = wx + 10 + (item.col or 0) * 16
-  local hy = wy + wh - 22
-  local dx, dy = hx - x0, hy - y0
-  local dist = math.sqrt(dx * dx + dy * dy)
-  if dist < 1 then dist = 1 end
+  local hx, hy, tx, ty = self:think_shot_target(item.col, item.row, #(item.text or ""))
   local speed = 860
-  self.thoughts[#self.thoughts + 1] = {
-    x = x0, y = y0, vx = (dx / dist) * speed, vy = (dy / dist) * speed,
-    hx = hx, hy = hy, text = item.text, join = item.join, age = 0, life = 2.2, color = CYAN, form = 0,
-  }
+  local shot = self:spawn_shot(x0, y0, hx, hy, {
+    tx = tx, ty = ty, text = item.text, join = item.join, col = item.col, color = CYAN, speed = speed, life = 2.2,
+  })
+  -- only shove the bolt if it was born inside the well; a real wand tip stays put
+  if self:wand() then
+    local _, wy, _, wh = self:think_well()
+    if shot.y >= wy and shot.y <= wy + wh then
+      shot.y = wy + wh + 36
+      shot.vy = -math.abs(shot.vy)
+      if math.abs(shot.vy) < 80 then shot.vy = -speed end
+    end
+  end
+  self.thoughts[#self.thoughts + 1] = shot
   self.think_busy = true
+  self:flick()
   self.thinkGap = 0.03
   if #self.thoughts > 8 then
     local keep = {}
@@ -609,7 +731,7 @@ function Demo:apply_code_line(text)
   self.board[#self.board + 1] = { kind = "code", text = text, num = #self.code }
   self.caret = math.max(0, #self.board - 1)
   self:nudge_code_scroll()
-  self.pulse = 1
+  if not self:wand() then self.pulse = 1 end
 end
 
 function Demo:code_fast()
@@ -637,7 +759,7 @@ function Demo:apply_shell_line(text)
   if #self.term > self:pad_rows() then
     self.code_lift = 36
   end
-  self.pulse = 1
+  if not self:wand() then self.pulse = 1 end
 end
 
 function Demo:fire_next_shell()
@@ -668,15 +790,11 @@ function Demo:fire_next_shell()
   end
   local hx, hy = self:shell_line_xy(dest)
   local x0, y0 = self:muzzle()
-  local dx, dy = hx - x0, hy - y0
-  local dist = math.sqrt(dx * dx + dy * dy)
-  if dist < 1 then dist = 1 end
-  local speed = 980
-  self.shellShots[#self.shellShots + 1] = {
-    x = x0, y = y0, vx = (dx / dist) * speed, vy = (dy / dist) * speed,
-    hx = hx, hy = hy, dest = dest, text = line, age = 0, life = 2.8, form = 0,
-  }
+  self.shellShots[#self.shellShots + 1] = self:spawn_shot(x0, y0, hx, hy, {
+    dest = dest, text = line, speed = 980, life = 2.8,
+  })
   self.shellBusy = true
+  self:flick()
   self.shellGap = 0.09
   if #self.shellShots > 8 then
     local keep = {}
@@ -707,24 +825,11 @@ function Demo:step_shell(dt)
     sh.age = sh.age + dt
     if sh.dest then
       sh.hx, sh.hy = self:shell_line_xy(sh.dest)
+      sh.tx, sh.ty = sh.hx, sh.hy
     end
-    local dx, dy = sh.hx - sh.x, sh.hy - sh.y
-    local dist = math.sqrt(dx * dx + dy * dy)
-    local toward = sh.vx * dx + sh.vy * dy
-    if dist < 22 or (sh.age > 0.08 and toward <= 0) or sh.age >= sh.life then
+    if self:steer_shot(sh, dt, 980) then
       self:apply_shell_line(sh.text)
-      sh.form = 1
-      sh.x, sh.y = sh.hx, sh.hy
-      sh.vx, sh.vy = 0, 0
     else
-      local k = 1 - math.exp(-10 * dt)
-      local speed = 980
-      local inv = 1 / (dist < 1 and 1 or dist)
-      sh.vx = sh.vx + (dx * inv * speed - sh.vx) * k
-      sh.vy = sh.vy + (dy * inv * speed - sh.vy) * k
-      sh.x = sh.x + sh.vx * dt
-      sh.y = sh.y + sh.vy * dt
-      sh.form = math.min(0.9, 1 - dist / 180)
       live[#live + 1] = sh
     end
   end
@@ -765,15 +870,11 @@ function Demo:fire_next_code()
   local line = table.remove(self.codeQ, 1)
   local hx, hy = self:code_target()
   local x0, y0 = self:muzzle()
-  local dx, dy = hx - x0, hy - y0
-  local dist = math.sqrt(dx * dx + dy * dy)
-  if dist < 1 then dist = 1 end
-  local speed = self:code_speed()
-  self.codeShots[#self.codeShots + 1] = {
-    x = x0, y = y0, vx = (dx / dist) * speed, vy = (dy / dist) * speed,
-    hx = hx, hy = hy, text = line, age = 0, life = 2.8, form = 0,
-  }
+  self.codeShots[#self.codeShots + 1] = self:spawn_shot(x0, y0, hx, hy, {
+    text = line, speed = self:code_speed(), life = 2.8,
+  })
   self.codeBusy = true
+  self:flick()
   self.codeGap = self:code_fast() and 0.09 or 0.16
   if #self.codeShots > 8 then
     local keep = {}
@@ -801,23 +902,9 @@ function Demo:step_code(dt)
   local live = {}
   for _, sh in ipairs(self.codeShots) do
     sh.age = sh.age + dt
-    local dx, dy = sh.hx - sh.x, sh.hy - sh.y
-    local dist = math.sqrt(dx * dx + dy * dy)
-    local toward = sh.vx * dx + sh.vy * dy
-    if dist < 36 or (sh.age > 0.05 and toward <= 0) or sh.age >= sh.life then
+    if self:steer_shot(sh, dt, self:code_speed()) then
       self:apply_code_line(sh.text)
-      sh.form = 1
-      sh.x, sh.y = sh.hx, sh.hy
-      sh.vx, sh.vy = 0, 0
     else
-      local k = 1 - math.exp(-10 * dt)
-      local speed = self:code_speed()
-      local inv = 1 / (dist < 1 and 1 or dist)
-      sh.vx = sh.vx + (dx * inv * speed - sh.vx) * k
-      sh.vy = sh.vy + (dy * inv * speed - sh.vy) * k
-      sh.x = sh.x + sh.vx * dt
-      sh.y = sh.y + sh.vy * dt
-      sh.form = math.min(0.9, 1 - dist / 180)
       live[#live + 1] = sh
     end
   end
@@ -851,6 +938,7 @@ function Demo:flush_think(done)
     if nl then
       self.think_nl = true
       self.think_fill = 0
+      self.think_row = (self.think_row or 0) + 1
       i = nl + 1
     else
       self.thinkEmitted = #raw - #hold
@@ -869,9 +957,11 @@ function Demo:set_think(text, done)
   local prev = self.thinking or ""
   if nxt == "" or nxt:sub(1, #prev) ~= prev then
     self.think_q = {}
+    self.think_buf = ""
     self.thinkEmitted = 0
     self.think_fill = 0
     self.think_nl = false
+    self.think_row = 0
     self.thoughts = {}
     self.think_board = {}
     self.think_busy = false
@@ -887,8 +977,8 @@ function Demo:launch_from_enter()
   local cx, cy = self:composer_origin()
   self.x, self.y = cx, cy
   self.launch_x, self.launch_y = cx, cy
-  self.facing = 1
-  self.pulse = 1
+  self.facing = self:wand() and -1 or 1
+  if not self:wand() then self.pulse = 1 end
   self.trail = {}
   self.launch = 1
   self.launch_t = 0
@@ -914,6 +1004,7 @@ function Demo:clear_live()
   self.thinkEmitted = 0
   self.think_fill = 0
   self.think_nl = false
+  self.think_row = 0
   self.think_busy = false
   self.think_hold = 0
   self.think_a = 0
@@ -1045,9 +1136,10 @@ function Demo:update(dt)
         local e = u * u * (3 - 2 * u)
         local x0, y0 = self.launch_x or self.x, self.launch_y or self.y
         local mx, my = W / 2, y0 - 180
+        local land_x, land_y = cx, cy
         local ox = self.x
-        self.x = (1 - e) * (1 - e) * x0 + 2 * (1 - e) * e * mx + e * e * cx
-        self.y = (1 - e) * (1 - e) * y0 + 2 * (1 - e) * e * my + e * e * cy
+        self.x = (1 - e) * (1 - e) * x0 + 2 * (1 - e) * e * mx + e * e * land_x
+        self.y = (1 - e) * (1 - e) * y0 + 2 * (1 - e) * e * my + e * e * land_y
         local vx = dt > 0 and (self.x - ox) / dt or 0
         if vx < -18 then
           self.facing = -1
@@ -1076,13 +1168,17 @@ function Demo:update(dt)
         local ox = self.x
         self.x = self.x + (tx - self.x) * k
         self.y = self.y + (ty - self.y) * k
-        local vx = dt > 0 and (self.x - ox) / dt or 0
-        if self.mx and math.abs(self.mx - self.x) > 18 then
-          self.facing = self.mx < self.x and -1 or 1
-        elseif vx < -28 then
+        if self:wand() then
           self.facing = -1
-        elseif vx > 28 then
-          self.facing = 1
+        else
+          local vx = dt > 0 and (self.x - ox) / dt or 0
+          if self.mx and math.abs(self.mx - self.x) > 18 then
+            self.facing = self.mx < self.x and -1 or 1
+          elseif vx < -28 then
+            self.facing = -1
+          elseif vx > 28 then
+            self.facing = 1
+          end
         end
       end
     end
@@ -1090,31 +1186,11 @@ function Demo:update(dt)
   local live_t = {}
   for _, th in ipairs(self.thoughts) do
     th.age = th.age + dt
-    local dx, dy = th.hx - th.x, th.hy - th.y
-    local dist = math.sqrt(dx * dx + dy * dy)
-    if dist < 22 then
-      th.form = 1
-      th.x, th.y = th.hx, th.hy
-      th.vx, th.vy = 0, 0
-      local last = self.think_board[#self.think_board]
-      local width = self:think_width()
-      if th.join and last and #(last .. " " .. th.text) <= width then
-        self.think_board[#self.think_board] = last .. " " .. th.text
-      else
-        self.think_board[#self.think_board + 1] = U.clip_text(th.text, width)
-      end
-      if #self.think_board > 6 then table.remove(self.think_board, 1) end
+    if self:steer_shot(th, dt, th.speed or 860) then
+      self:land_think(th.text, th.join, th.col)
       self.think_busy = false
-    else
-      local k = 1 - math.exp(-14 * dt)
-      local speed = 860
-      local inv = 1 / (dist < 1 and 1 or dist)
-      th.vx = th.vx + (dx * inv * speed - th.vx) * k
-      th.vy = th.vy + (dy * inv * speed - th.vy) * k
-      th.x = th.x + th.vx * dt
-      th.y = th.y + th.vy * dt
-      th.form = math.min(1, 1 - dist / 160)
-      if th.age < th.life then live_t[#live_t + 1] = th end
+    elseif th.age < th.life then
+      live_t[#live_t + 1] = th
     end
   end
   self.thoughts = live_t
@@ -1309,9 +1385,12 @@ function Demo:draw()
   local credit = kit.title or "GHOST"
   D.text(credit, W - D.textW(credit, 2) - 20, 14, PINK, 2)
 
-  for i, p in ipairs(self.trail) do
-    local k = i / math.max(1, #self.trail)
-    D.shot(kit.trail or "spark", p[1], p[2], D.mix(CYAN, PINK, k), self.t + i)
+  -- wand kits leave flakes on the bolt itself, not a walk-trail of spells
+  if not self:wand() then
+    for i, p in ipairs(self.trail) do
+      local k = i / math.max(1, #self.trail)
+      D.shot(kit.trail or "spark", p[1], p[2], D.mix(CYAN, PINK, k), self.t + i)
+    end
   end
 
   local tool_col = T.TOOL_COL[self.tool] or self.sky or CYAN
@@ -1336,8 +1415,10 @@ function Demo:draw()
   for _, th in ipairs(self.thoughts) do
     if th.form < 1 then
       D.shot(kit.think_shot or kit.shot or "spark", th.x, th.y, CYAN, th.age or self.t)
-      D.text(th.text, th.x + 10, th.y - 6, INK, 2)
-      D.text(th.text, th.x + 9, th.y - 7, CYAN, 2)
+      -- word sits on the bolt, so the hit is the end of that word
+      local tw = D.textW(th.text or "", 2)
+      D.text(th.text, th.x - tw * 0.5 + 1, th.y - 7, INK, 2)
+      D.text(th.text, th.x - tw * 0.5, th.y - 8, CYAN, 2)
     end
   end
 
@@ -1404,10 +1485,22 @@ function Demo:draw()
     end
     local hull = kit.hull or self.sky
     local hero = kit.hero or "ghost"
-    if hero ~= "aladdin" and hero ~= "harry" then
+    if hero ~= "aladdin" and hero ~= "harry" and hero ~= "ron" and hero ~= "hermione" then
       hull = self.sky or hull
     end
-    D.hero(kit.hero or "ghost", self.x, self.y + bob, self.facing, self.scale, (kit.hero == "harry") and (self.cast or self.t) or self.pulse, hull, CYAN, CREAM, WHITE, PINK)
+    local pulse = self.pulse
+    local painter = D
+    if kit.painter and kit.painter ~= "draw" then
+      painter = require(kit.painter)
+    elseif hero == "ron" or hero == "hermione" then
+      painter = require("wizards")
+    end
+    local fn = painter[hero]
+    if type(fn) == "function" then
+      fn(self.x, self.y + bob, self.facing, self.scale, pulse, hull, CYAN, CREAM, WHITE, PINK)
+    else
+      painter.hero(hero, self.x, self.y + bob, self.facing, self.scale, pulse, hull, CYAN, CREAM, WHITE, PINK)
+    end
   end
 end
 

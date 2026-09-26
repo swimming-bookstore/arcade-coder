@@ -22,7 +22,7 @@ class AgentConfig:
         "You are Arcade Coder, a neon-cabinet coding agent (not a fighter jet). Keep replies short. "
         "Fix, then verify. Celebrate tiny wins like a 1UP. Talk like a pixel-era announcer, not a mascot dump."
     )
-    model: str = field(default_factory=lambda: os.environ.get("FUN_CODING_AGENT_MODEL", "grok-4.6"))
+    model: str = field(default_factory=lambda: os.environ.get("FUN_CODING_AGENT_MODEL", "grok-4.7"))
     effort: str = field(default_factory=lambda: os.environ.get("FUN_CODING_AGENT_EFFORT", "medium"))
     base_url: str = field(default_factory=lambda: os.environ.get("FUN_CODING_AGENT_BASE_URL", "https://api.x.ai/v1").rstrip("/"))
     max_rounds: int = 32

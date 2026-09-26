@@ -139,7 +139,7 @@ def grok_complete(
             "input": to_input(session),
             "tools": agent.tool_schemas(),
             "stream": True,
-            "reasoning": {"effort": agent.effort()},
+            "reasoning": {"effort": agent.effort(), "summary": "auto"},
         }
     ).encode()
     u = urlparse(agent.config.base_url)

@@ -29,7 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 LOVE_DIR = ROOT / "love2d"
 WS = Path(os.environ.get("ARCADE_WORKSPACE", "/tmp/demo"))
-KITS = ("ghost", "invader", "frog", "ship", "dog", "cat", "aladdin", "harry")
+KITS = ("ghost", "invader", "frog", "ship", "dog", "cat", "aladdin", "harry", "ron", "hermione")
 TITLE = "Arcade Coder"
 FPS = int(os.environ.get("FPS", "15"))
 MAX_SEC = float(os.environ.get("DURATION", "90"))
@@ -38,6 +38,13 @@ PORT = int(os.environ.get("ARCADE_PORT", "8765"))
 URL = os.environ.get("ARCADE_AGENT", f"http://{HOST}:{PORT}/")
 
 PROMPT = "write hi.py that prints PLAYER 1 READY then HI-SCORE ARCADE CODER, then run it with python3"
+
+# Potter kits type a spell-themed line, not the cabinet high-score prompt.
+PROMPTS = {
+    "harry": "write expelliarmus.py that prints EXPELLIARMUS then WAND AT THE READY, then run it with python3",
+    "ron": "write jinx.py that prints STUPEFY then RON WEASLEY IS UP, then run it with python3",
+    "hermione": "write charm.py that prints IT IS LEVIOSA then BOOK OPEN WAND OUT, then run it with python3",
+}
 
 os.environ.setdefault("DISPLAY", ":0.0")
 os.environ.setdefault("XAUTHORITY", str(Path.home() / ".Xauthority"))
@@ -254,7 +261,8 @@ def record_kit(kit: str, love: str) -> int:
     )
     try:
         # Type the first half before ffmpeg opens, so the clip starts mid-sentence.
-        half = len(PROMPT) // 2
+        prompt = PROMPTS.get(kit, PROMPT)
+        half = len(prompt) // 2
         gate = threading.Event()
         WindowRecord._capture_gate = gate
         try:
@@ -267,6 +275,7 @@ def record_kit(kit: str, love: str) -> int:
                 min_h=360,
                 hide_cursor=True,
                 overlay_pointer=True,
+                pid=proc.pid,
             ) as rec:
                 rec.hold(0.8)
                 rec.focus()
@@ -274,11 +283,11 @@ def record_kit(kit: str, love: str) -> int:
                 # composer is the bottom HUD bar; click it before the first letter
                 rec.click(ww * 0.5, wh - 36)
                 rec.hold(0.35)
-                rec.type_text(PROMPT[:half], delay=0.045)
+                rec.type_text(prompt[:half], delay=0.045)
                 rec.hold(0.15)
                 gate.set()
                 rec.hold(0.35)
-                rec.type_text(PROMPT[half:], delay=0.045)
+                rec.type_text(prompt[half:], delay=0.045)
                 rec.hold(0.4)
                 rec.key("Return")
                 rec.hold(0.5)

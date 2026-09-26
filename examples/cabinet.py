@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example: a named arcade-cabinet coding agent on this workspace.
 
-Kits (ghost / invader / frog / ship / dog / cat / aladdin / harry) live in the LÖVE pad:
+Kits (ghost / invader / frog / ship / dog / cat / aladdin / harry / ron / hermione) live in the LÖVE pad:
 
     ARCADE_KIT=frog python3 love2d/run.py
 """
