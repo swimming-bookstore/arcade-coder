@@ -13,7 +13,7 @@ python3 -m fighter --name "Arcade Coder"
 python3 love2d/run.py
 ```
 
-Tab cycles kits: `ghost` · `invader` · `frog` · `ship` · `dog` · `cat` · `aladdin` · `harry`.
+Tab cycles kits: `ghost` · `invader` · `frog` · `ship` · `dog` · `cat` · `aladdin` · `harry` · `ron` · `hermione`.
 Each kit drops straight into its stage (maze, space, pond, neon, kennel, alley, Agrabah, Hogwarts). No title card.
 
 ```bash
@@ -60,12 +60,14 @@ pad.kit.register({
   name = "slime",
   title = "SLIME",
   callsign = "GOO",
-  hero = "frog",     -- ghost | invader | frog | ship | dog | cat | aladdin | harry  (or add draw.hero)
-  shot = "note",     -- coin | pellet | bubble | spark | capsule | bone | yarn | note | spell
+  hero = "frog",     -- ghost | invader | frog | ship | dog | cat | aladdin | harry | ron | hermione  (or add draw.hero)
+  shot = "note",     -- coin | pellet | bubble | spark | capsule | bone | yarn | note | spell | jinx | charm
   think_shot = "spark",
   trail = "spark",
   stage = "agrabah", -- arcade | agrabah | maze | space | pond | kennel | alley | hogwarts
   courier = true,  -- fly there and put it down (ghost default)
+  -- aim = "wand",  -- stand under the thinking well and shoot from the raised tip
+  -- painter = "draw", -- module that draws this hero; wand kits share draw.wand_pose
   scale = 3.2,
   muzzle = function(demo)
     return demo.x, demo.y + 18
@@ -93,6 +95,12 @@ ARCADE_KIT=cat python3 love2d/run.py
 
 python3 examples/harry.py
 ARCADE_KIT=harry python3 love2d/run.py
+
+python3 examples/ron.py
+ARCADE_KIT=ron python3 love2d/run.py
+
+python3 examples/hermione.py
+ARCADE_KIT=hermione python3 love2d/run.py
 ```
 
 ## Needs

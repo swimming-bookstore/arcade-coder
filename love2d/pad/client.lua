@@ -13,6 +13,7 @@ function M.apply(demo, ev, opts)
   local name = opts.name or "Arcade Coder"
 
   if event == "think" then
+    demo._saw_think = true
     demo:set_think((demo.thinking or "") .. (v.text or ""))
     demo.pulse = 0.7
     demo.caption = "THINKING  ·  grok"
@@ -20,6 +21,10 @@ function M.apply(demo, ev, opts)
     demo._agent = (demo._agent or "") .. (v.text or "")
     demo:say(demo._agent, callsign)
     demo.caption = "SAY  ·  grok"
+    -- grok bills reasoning but does not stream it; the wand still needs a bolt
+    if demo.wand and demo:wand() and not demo._saw_think then
+      demo:set_think(demo._agent)
+    end
   elseif event == "open" then
     if (v.name or "") == "edit" and v.path then
       demo.caption = "EDIT  ·  " .. tostring(v.path)

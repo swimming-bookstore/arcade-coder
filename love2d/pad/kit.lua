@@ -3,7 +3,7 @@
 --     pad.kit.register({ name = "ghost", hero = "ghost", shot = "coin", courier = true })
 --     demo:use_kit("ghost")
 --
--- Built-ins: ghost, invader, frog, ship, dog, cat, aladdin, harry.
+-- Built-ins: ghost, invader, frog, ship, dog, cat, aladdin, harry, ron, hermione.
 -- Override with env ARCADE_KIT or Demo.new({ kit = "frog" }).
 
 local K = {}
@@ -32,6 +32,20 @@ function K.names()
   end
   table.sort(n)
   return n
+end
+
+-- Raised wand tip, same numbers the hero is drawn with.
+function K.wand_tip(demo)
+  local draw = require("draw")
+  local pose = draw.wand_pose or draw.harry_pose
+  -- hero() bobs the sprite; the bolt has to leave that same tip
+  local bob = math.sin((demo.t or 0) * 1.6 * math.pi * 2) * 4
+  return pose(demo.x, demo.y + bob, demo.facing, demo.scale, demo.pulse or 0)
+end
+
+function K.wand_muzzle(demo)
+  local p = K.wand_tip(demo)
+  return p.tipx, p.tipy
 end
 
 K.register({
@@ -169,18 +183,58 @@ K.register({
   shot = "spell",
   think_shot = "spell",
   trail = "spell",
-  stage = "hogwarts",
+  stage = "hall",
   tagline = "WINGARDIUM CODE-OSA",
   hull = {36, 48, 120},
+  aim = "wand",
+  painter = "draw",
   scale = 4.6,
   attract_scale = 7.6,
   -- raised wand tip — same pose as draw.harry
   muzzle = function(demo)
-    local draw = require("draw")
-    local wave = demo.cast or demo.t or 0
-    local p = draw.harry_pose(demo.x, demo.y, demo.facing, demo.scale, wave)
-    return p.tipx, p.tipy
+    return K.wand_muzzle(demo)
   end,
+})
+
+local function trio_muzzle(demo)
+  -- same raised tip Harry already shoots from
+  return K.wand_muzzle(demo)
+end
+
+K.register({
+  name = "ron",
+  title = "RON",
+  callsign = "JINX",
+  hero = "ron",
+  shot = "jinx",
+  think_shot = "jinx",
+  trail = "jinx",
+  stage = "hall",
+  tagline = "BLOODY BRILLIANT COMMIT",
+  hull = {36, 48, 120},
+  aim = "wand",
+  scale = 4.6,
+  attract_scale = 7.6,
+  painter = "wizards",
+  muzzle = trio_muzzle,
+})
+
+K.register({
+  name = "hermione",
+  title = "HERMIONE",
+  callsign = "CHARM",
+  hero = "hermione",
+  shot = "charm",
+  think_shot = "charm",
+  trail = "charm",
+  stage = "hall",
+  tagline = "IT'S LEVIOSA, NOT LEVIOSAR",
+  hull = {92, 36, 120},
+  aim = "wand",
+  scale = 4.6,
+  attract_scale = 7.6,
+  painter = "wizards",
+  muzzle = trio_muzzle,
 })
 
 return K

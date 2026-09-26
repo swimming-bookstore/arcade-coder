@@ -300,11 +300,13 @@ function M.shot(kind, x, y, col, t)
     love.graphics.polygon("fill", x + 7, ny - 12, x + 16, ny - 6, x + 7, ny - 4)
     love.graphics.setColor(c({255, 255, 255}, 0.85))
     love.graphics.ellipse("fill", x - 4, ny + 5, 3, 2)
-  elseif kind == "spell" then
-    -- pointed wand bolt: gold rim, cyan body, white core, trailing sparks
+  elseif kind == "spell" or kind == "jinx" or kind == "charm" then
+    -- pointed wand bolt: gold rim, colored body, white core, trailing sparks
     local spin = (t or 0) * 8
     local gold = {255, 214, 92}
     local core = {255, 255, 255}
+    if kind == "jinx" then gold = {255, 92, 64} end
+    if kind == "charm" then gold = {240, 204, 112} end
     M.glow(x, y, 26, col, 0.28)
     M.glow(x, y, 12, gold, 0.45)
     local function star(rad, inner, rot, rgb, a)
@@ -421,6 +423,143 @@ function M.stage(kind, t, W, H, sky_tint, sky_a)
     fn = M.arcade
   end
   fn(t, W, H, sky_tint, sky_a)
+end
+
+-- Great Hall: vaulted beams, house banners, floating candles, long tables.
+function M.hall(t, W, H, sky_tint, sky_a)
+  local NIGHT = {8, 10, 28}
+  local BEAM = {62, 36, 28}
+  local BEAM2 = {36, 20, 16}
+  local STONE = {92, 86, 96}
+  local STONE2 = {48, 44, 58}
+  local GOLD = {255, 206, 88}
+  local CREAM = {255, 236, 196}
+  local WOOD = {86, 48, 28}
+  local WOOD2 = {52, 28, 16}
+  local CLOTH = {28, 18, 22}
+  sky_a = sky_a or 0
+
+  -- enchanted ceiling, dusk at the ridge
+  local vault = math.floor(H * 0.62)
+  for i = 0, 26 do
+    local k = i / 26
+    local col = k < 0.7 and M.mix({6, 8, 24}, {18, 22, 64}, k / 0.7) or M.mix({18, 22, 64}, {72, 40, 78}, (k - 0.7) / 0.3)
+    if sky_tint and sky_a > 0.01 then
+      col = M.mix(col, sky_tint, 0.10 * sky_a)
+    end
+    M.rect(0, math.floor(vault * k), W, math.ceil(vault / 26) + 1, col)
+  end
+  for i = 0, 48 do
+    local sx = (i * 137) % W
+    local sy = (i * 41) % math.max(8, vault - 40)
+    local tw = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(t * 1.8 + i))
+    M.rect(sx, sy, (i % 9 == 0) and 3 or 2, (i % 9 == 0) and 3 or 2, (i % 4 == 0) and GOLD or CREAM, 0.15 + 0.4 * tw)
+  end
+
+  -- hammer beams
+  for i = 0, 6 do
+    local x = 70 + i * ((W - 140) / 6)
+    love.graphics.setColor(c(BEAM2))
+    love.graphics.setLineWidth(10)
+    love.graphics.arc("line", "open", x, 8, 118, 0.15, math.pi - 0.15)
+    love.graphics.setColor(c(BEAM, 0.85))
+    love.graphics.setLineWidth(4)
+    love.graphics.arc("line", "open", x, 8, 118, 0.15, math.pi - 0.15)
+  end
+  love.graphics.setLineWidth(1)
+  M.rect(0, 0, W, 18, BEAM2)
+  M.rect(0, 16, W, 4, GOLD, 0.35)
+
+  -- side walls
+  M.rect(0, 18, 54, H, STONE2)
+  M.rect(W - 54, 18, 54, H, STONE2)
+  for row = 0, 16 do
+    M.rect(0, 28 + row * 42, 54, 3, STONE, 0.35)
+    M.rect(W - 54, 28 + row * 42, 54, 3, STONE, 0.35)
+  end
+  -- tall windows, night outside
+  for i = 0, 3 do
+    local wy = 70 + i * 120
+    for side = 0, 1 do
+      local wx = side == 0 and 10 or W - 40
+      M.rect(wx, wy, 30, 78, NIGHT)
+      M.rect(wx + 13, wy, 3, 78, STONE, 0.7)
+      M.rect(wx, wy + 36, 30, 3, STONE, 0.7)
+      M.glow(wx + 15, wy + 20, 18, {120, 150, 220}, 0.08)
+    end
+  end
+
+  -- far table
+  local far_y = math.floor(H * 0.46)
+  M.rect(120, far_y, W - 240, 16, WOOD)
+  M.rect(120, far_y, W - 240, 4, WOOD2)
+  M.rect(150, far_y + 14, 14, 36, WOOD2)
+  M.rect(W - 164, far_y + 14, 14, 36, WOOD2)
+
+  -- flagstones
+  for i = 0, 10 do
+    local k = i / 10
+    M.rect(0, far_y + 28 + math.floor((H - far_y - 28) * k), W, math.ceil((H - far_y) / 10) + 1, M.mix({54, 48, 58}, {28, 24, 34}, k))
+  end
+  for i = 0, 8 do
+    M.rect(60, far_y + 40 + i * 28, W - 120, 2, STONE, 0.18)
+  end
+
+  -- near tables, left and right so the well stays clear
+  local function table(x, y, w)
+    M.rect(x, y, w, 18, CLOTH)
+    M.rect(x, y + 16, w, 8, WOOD)
+    M.rect(x + 16, y + 22, 12, 40, WOOD2)
+    M.rect(x + w - 28, y + 22, 12, 40, WOOD2)
+    for i = 0, 3 do
+      local px = x + 24 + i * (w * 0.22)
+      M.rect(px, y + 4, 16, 8, GOLD, 0.35)
+      M.rect(px + 18, y + 5, 10, 7, {180, 40, 36}, 0.7)
+    end
+  end
+  table(70, H * 0.72, 280)
+  table(W - 350, H * 0.72, 280)
+
+  -- candles over the hall, kept clear of the thinking well and the banners
+  for i = 0, 9 do
+    local cx = 80 + (i * 127) % (W - 140)
+    if cx > W * 0.36 and cx < W * 0.64 then
+      cx = (i % 2 == 0) and W * 0.30 or W * 0.70
+    end
+    -- stay off the hanging house cloth
+    local slot = (cx - 90) / ((W - 220) / 3)
+    local near = slot - math.floor(slot + 0.5)
+    if math.abs(near) < 0.18 and cx < W - 80 then
+      cx = cx + 46
+    end
+    local cy = 54 + (i % 4) * 22 + math.sin(t * 1.1 + i) * 6
+    M.glow(cx, cy - 6, 16, GOLD, 0.20)
+    M.rect(cx - 3, cy, 6, 12, {232, 210, 170})
+    love.graphics.setColor(c({255, 160, 48}, 0.9))
+    love.graphics.circle("fill", cx, cy - 4, 3)
+  end
+
+  -- house cloth last, fully opaque, so beams and candle glow cannot punch a hole
+  love.graphics.setBlendMode("alpha")
+  local houses = {
+    {20, 160, 64},
+    {148, 28, 28},
+    {212, 176, 48},
+    {36, 48, 140},
+  }
+  for i, colr in ipairs(houses) do
+    -- Slytherin (green) sat on the left wall; park it further in, then space the rest
+    local bx = 168 + (i - 1) * ((W - 300) / 3)
+    local left, right, top, mid, tip = bx - 22, bx + 30, 36, 114, 138
+    M.rect(bx, 22, 8, 16, GOLD, 1)
+    -- body as a solid rect, then a solid tip triangle — no holes
+    M.rect(left, top, right - left, mid - top, colr, 1)
+    love.graphics.setColor(colr[1] / 255, colr[2] / 255, colr[3] / 255, 1)
+    love.graphics.polygon("fill", left, mid, right, mid, bx + 4, tip)
+    love.graphics.setColor(CREAM[1] / 255, CREAM[2] / 255, CREAM[3] / 255, 1)
+    love.graphics.rectangle("fill", left, top, right - left, 6)
+    M.diamond(bx + 4, 70, 10, GOLD, 1)
+  end
 end
 
 -- Agrabah night: moon, onion palaces, dunes, lanterns.
@@ -1006,19 +1145,30 @@ function M.aladdin(cx, cy, facing, scale, pulse, hull, CYAN, CREAM, WHITE, PINK)
 end
 
 -- Shared pose so the drawn wand tip and kit.muzzle stay the same point.
+-- Alias kept for kits that call wand_pose instead of harry_pose.
+function M.wand_pose(cx, cy, facing, scale, pulse)
+  return M.harry_pose(cx, cy, facing, scale, pulse)
+end
+
 function M.harry_pose(cx, cy, facing, scale, pulse)
   local s = 4.0 * (scale or 3)
-  local f = (facing or 1) >= 0 and 1 or -1
-  local bob = math.sin((pulse or 0) * 6) * 0.045 * s
-  local cast = 0.5 + 0.5 * math.sin((pulse or 0) * 9)
-  local wrist_x = cx + f * 0.55 * s
-  local wrist_y = cy + bob - (0.95 + cast * 0.55) * s
+  -- face left, right-handed: wand on the right, one flick across to the left
+  local f = -1
+  local hand = 1
+  local fire = M.clamp(pulse or 0)
+  local cast = math.sin(math.pi * fire)
+  local cyb = cy
+  local shx = cx + hand * 0.32 * s
+  local shy = cyb - 0.28 * s
+  -- rest: wrist by the right shoulder. slash: cross the body left, never over the glasses
+  local ax = cx + (0.62 - cast * 1.15) * s
+  local ay = cyb - (0.52 + cast * 0.08) * s
   return {
-    s = s, f = f, bob = bob, cast = cast,
-    cy = cy + bob,
-    ax = wrist_x, ay = wrist_y,
-    tipx = wrist_x + f * (1.15 + cast * 0.15) * s,
-    tipy = wrist_y - (0.85 + cast * 0.35) * s,
+    s = s, f = f, hand = hand, bob = 0, cast = cast,
+    cy = cyb, shx = shx, shy = shy,
+    ax = ax, ay = ay,
+    tipx = ax + f * (0.12 + cast * 1.35) * s,
+    tipy = ay - (1.38 - cast * 1.05) * s,
   }
 end
 
@@ -1099,10 +1249,10 @@ function M.harry(cx, cy, facing, scale, pulse, hull, CYAN, CREAM, WHITE, PINK)
   love.graphics.ellipse("fill", cx - 0.22 * s, cy + 1.46 * s, 0.18 * s, 0.07 * s)
   love.graphics.ellipse("fill", cx + 0.16 * s, cy + 1.46 * s, 0.18 * s, 0.07 * s)
 
-  -- scarf: a band at the collar and a striped tail
+  -- scarf: a band at the collar and a striped tail on the left, away from the wand
   setc(scarf)
   love.graphics.ellipse("fill", cx, cy - 0.52 * s, 0.30 * s, 0.10 * s)
-  local tx = cx - f * 0.20 * s
+  local tx = cx - 0.20 * s
   love.graphics.polygon(
     "fill",
     tx - 0.06 * s, cy - 0.48 * s,
@@ -1119,17 +1269,17 @@ function M.harry(cx, cy, facing, scale, pulse, hull, CYAN, CREAM, WHITE, PINK)
   setc(scarf)
   love.graphics.circle("fill", cx + f * 0.06 * s, cy - 0.22 * s, 0.028 * s)
 
-  -- off arm, tucked
+  -- off arm hangs on the left; wand is the right hand
   setc(robe_sh)
   love.graphics.polygon(
     "fill",
-    cx - f * 0.22 * s, cy - 0.35 * s,
-    cx - f * 0.48 * s, cy - 0.05 * s,
-    cx - f * 0.42 * s, cy + 0.18 * s,
-    cx - f * 0.16 * s, cy - 0.10 * s
+    cx - 0.22 * s, cy - 0.35 * s,
+    cx - 0.48 * s, cy - 0.05 * s,
+    cx - 0.42 * s, cy + 0.18 * s,
+    cx - 0.16 * s, cy - 0.10 * s
   )
   setc(skin)
-  love.graphics.circle("fill", cx - f * 0.46 * s, cy + 0.16 * s, 0.08 * s)
+  love.graphics.circle("fill", cx - 0.46 * s, cy + 0.16 * s, 0.08 * s)
 
   -- head
   setc(skin)
@@ -1206,25 +1356,25 @@ function M.harry(cx, cy, facing, scale, pulse, hull, CYAN, CREAM, WHITE, PINK)
   setc({160, 70, 74})
   love.graphics.arc("line", cx + f * 0.02 * s, cy - 0.66 * s, 0.07 * s, 0.3, math.pi - 0.3)
 
-  -- raised arm: sleeve from shoulder to wrist
-  local shx, shy = cx + f * 0.20 * s, cy - 0.35 * s
+  -- raised arm: sleeve from shoulder to swinging wrist
+  local shx, shy = p.shx or (cx + f * 0.20 * s), p.shy or (cy - 0.35 * s)
   setc(robe)
   love.graphics.setLineWidth(0.22 * s)
   love.graphics.line(shx, shy, p.ax, p.ay)
   setc(robe_hi, 0.7)
   love.graphics.setLineWidth(0.08 * s)
-  love.graphics.line(shx + f * 0.04 * s, shy - 0.04 * s, p.ax, p.ay)
+  love.graphics.line(shx + 0.04 * s, shy - 0.04 * s, p.ax, p.ay)
   -- cuff
   setc(gold)
-  love.graphics.circle("fill", p.ax - f * 0.04 * s, p.ay + 0.06 * s, 0.09 * s)
+  love.graphics.circle("fill", p.ax - 0.04 * s, p.ay + 0.06 * s, 0.09 * s)
   -- hand
   setc(skin)
   love.graphics.circle("fill", p.ax, p.ay, 0.11 * s)
   setc(skin_sh, 0.7)
-  love.graphics.circle("fill", p.ax + f * 0.04 * s, p.ay + 0.03 * s, 0.05 * s)
+  love.graphics.circle("fill", p.ax + 0.04 * s, p.ay + 0.03 * s, 0.05 * s)
 
   -- wand from the fist to the muzzle
-  local hx, hy = p.ax - f * 0.02 * s, p.ay + 0.08 * s
+  local hx, hy = p.ax - 0.02 * s, p.ay + 0.08 * s
   setc(wand)
   love.graphics.setLineWidth(math.max(1.6, 0.035 * s))
   love.graphics.line(hx, hy, p.tipx, p.tipy)
@@ -1233,9 +1383,14 @@ function M.harry(cx, cy, facing, scale, pulse, hull, CYAN, CREAM, WHITE, PINK)
   love.graphics.line(hx, hy, p.tipx, p.tipy)
   setc(gold)
   love.graphics.circle("fill", hx, hy, 0.045 * s)
-  M.glow(p.tipx, p.tipy, 0.36 * s, bolt, 0.30 + 0.2 * cast)
-  setc(white)
-  love.graphics.circle("fill", p.tipx, p.tipy, 0.045 * s)
+  if cast > 0.12 then
+    M.glow(p.tipx, p.tipy, 0.36 * s, bolt, 0.18 + 0.45 * cast)
+    setc(white)
+    love.graphics.circle("fill", p.tipx, p.tipy, 0.045 * s)
+  else
+    setc({210, 190, 140})
+    love.graphics.circle("fill", p.tipx, p.tipy, 0.03 * s)
+  end
   love.graphics.setLineWidth(1)
 end
 

@@ -167,6 +167,8 @@ local function send(text)
   demo.pulse = 1
   demo.caption = "GROK  ·  working"
   demo:set_think("")
+  demo._agent = nil
+  demo._saw_think = false
   demo:say(text, "YOU")
   push("turn", { text = text })
 end
